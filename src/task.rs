@@ -15,12 +15,13 @@ impl std::fmt::Display for Task {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "Task {}\nt: {t}\nc: {c}\np: {p}\nu: {u}",
+            "Task {}\nt: {t}\nc: {c}\np: {p}\nu: {u}\nr: {r}",
             self.name,
             t = self.t,
             c = self.c,
             p = self.p,
-            u = self.u
+            u = self.u,
+            r = self.r
         )
     }
 }

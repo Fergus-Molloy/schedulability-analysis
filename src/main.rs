@@ -11,25 +11,36 @@ fn main() {
         println!("{}\n", i);
     }
     // print if schedulable
-    let (util, max_util) = util(&tasks);
+    let (util, max_util) = util(&tasks, Some(4.0));
     if util <= max_util {
         println!(
             "max util: {:.4}\ntotal util: {:.4}\n{}",
             max_util,
             util,
-            "schedulable? true\n".green().bold()
+            "schedulable with utilization? true\n".green().bold()
         );
     } else {
         println!(
             "max util: {:.4}\ntotal util: {:.4}\n{}",
             max_util,
             util,
-            "schedulable? false\n".red().bold()
+            "schedulable with utilization? false\n".red().bold()
         );
     }
 
-    for x in tasks.iter() {
-        println!("Task {} has response time: {}", x.name, x.r);
+    //check that it is schedulable
+    let schedulable: Vec<&task::Task> = tasks.iter().filter(|x| x.r > x.t).collect();
+
+    if schedulable.len() == 0 {
+        println!(
+            "{}",
+            "schedulable with response time? true\n".green().bold()
+        );
+    } else {
+        println!("{}", "schedulable with response time? false\n".red().bold());
+        for x in schedulable.into_iter() {
+            println!("{} fails", x);
+        }
     }
 }
 
@@ -68,8 +79,11 @@ fn get_inp(tasks: &mut Vec<task::Task>) {
     }
 }
 
-fn util(tasks: &Vec<task::Task>) -> (f64, f64) {
-    let n = tasks.len() as f64;
+fn util(tasks: &Vec<task::Task>, families: Option<f64>) -> (f64, f64) {
+    let n = match families {
+        Some(v) => v,
+        None => tasks.len() as f64,
+    };
     let max_util = n * ((2 as f64).powf(1 as f64 / n) - 1 as f64);
     (tasks.iter().map(|x| x.u).sum(), max_util)
 }
