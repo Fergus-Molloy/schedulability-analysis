@@ -2,26 +2,29 @@ use std::cmp::Ordering;
 use std::fmt;
 
 #[derive(Clone)]
+#[allow(non_snake_case)]
 pub struct Task {
     pub name: String,
-    pub t: u32,
-    pub c: u32,
-    pub p: u32,
-    pub u: f64,
-    pub r: u32,
+    pub T: u32,
+    pub D: u32,
+    pub C: u32,
+    pub P: u32,
+    pub U: f64,
+    pub R: u32,
 }
 
 impl std::fmt::Display for Task {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "Task {}\nt: {t}\nc: {c}\np: {p}\nu: {u}\nr: {r}",
+            "Task {}\nT: {t}\nD: {d}\nC: {c}\nP: {p}\nU: {u}\nR: {r}",
             self.name,
-            t = self.t,
-            c = self.c,
-            p = self.p,
-            u = self.u,
-            r = self.r
+            t = self.T,
+            d = self.D,
+            c = self.C,
+            p = self.P,
+            u = self.U,
+            r = self.R
         )
     }
 }
@@ -41,6 +44,6 @@ impl PartialOrd for Task {
 
 impl Ord for Task {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.p.cmp(&other.p)
+        self.P.cmp(&other.P)
     }
 }
