@@ -66,7 +66,7 @@ fn main() {
                         "Task {} has response time {} and deadline {}",
                         x.name, x.R, x.D
                     )
-                    .cyan();
+                    .cyan()
                 }
                 println!("{}", s);
             })
