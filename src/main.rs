@@ -37,11 +37,6 @@ struct Opt {
 }
 
 fn main() {
-    //let tasks = get_inp("tasks", None);
-    //for x in tasks.iter() {
-    //    let r = task::response_time(&x, &tasks);
-    //    println!("{}\nR: {}\n", x, r);
-    //}
     command_line();
 }
 
@@ -67,7 +62,7 @@ fn command_line() {
     b.init();
 
     // Create task set
-    let mut task_set = get_inp(&opt.input, None);
+    let task_set = get_inp(&opt.input, None);
 
     if opt.debug {
         for task in task_set.iter() {
@@ -125,29 +120,105 @@ fn get_inp(file: &PathBuf, resources: Option<&str>) -> Vec<task::Task> {
 
     let mut task_set = Vec::new();
 
-    //skip title line
+    // use title line to check which parameters have been given and in what order
+    // below is all the possible parameter options
+    // let col_ordering = ["N", "T", "D", "C", "P", "CS"];
+    let mut col_ordering = Vec::with_capacity(6);
+    let first: String = inp.lines().take(1).collect();
+    for heading in first.split(',') {
+        match heading.trim() {
+            "N" => col_ordering.push("N"),
+            "T" => col_ordering.push("T"),
+            "D" => col_ordering.push("D"),
+            "C" => col_ordering.push("C"),
+            "P" => col_ordering.push("P"),
+            "CS" => col_ordering.push("CS"),
+            _ => panic!("unrecognised column name {}", heading),
+        }
+    }
+
+    //skip title line since it has been processed
     for x in inp.lines().skip(1) {
-        // split by , since csv
+        // split by , since file is csv
         let mut iter = x.split(',');
 
-        // items are in this order since users are using  a template
-        let name = iter.next().unwrap().trim().to_string();
+        // initialise varibales to impossible values
+        let mut name: &str = "";
+        let mut t: f64 = 0.0;
+        let mut d = 0.0;
+        let mut c = 0.0;
+        let mut p = 0;
 
-        let t: f64 = iter.next().unwrap().parse().unwrap();
+        // setup iterator varibales
+        let mut col = col_ordering.iter();
+        let mut next = col.next();
+        //while there is a column to process
+        while next.is_some() {
+            match next.unwrap() {
+                &"N" => {
+                    name = iter.next().unwrap().trim();
+                    debug!("name: {}", name);
+                }
+                &"T" => {
+                    t = iter.next().unwrap().parse().unwrap();
+                    debug!("T: {}", t);
+                }
+                &"D" => {
+                    let d_iter = iter.next().unwrap().trim();
+                    if d_iter.is_empty() {
+                        if t == 0.0 {
+                            // D column is present but no D is given (D is implicit) but T has not been processed yet
+                            d = 0.0;
+                        } else {
+                            // D is not given but there is a T to use
+                            d = t;
+                        }
+                    } else {
+                        // D is given
+                        d = d_iter.parse().unwrap();
+                    }
+                    debug!("D: {}", d);
+                }
+                &"C" => {
+                    let inp = iter.next().unwrap();
+                    debug!("c: {:?}", inp);
+                    c = inp.parse().unwrap();
+                }
+                &"P" => {
+                    let p_iter = iter.next().unwrap().trim();
+                    debug!("p: {}", p_iter);
+                    if p_iter.is_empty() {
+                        // P column is there but no value is given
+                        p = 0;
+                    } else {
+                        p = p_iter.parse().unwrap();
+                    }
+                }
+                _ => panic!("something has gone horribly wrong, God is dead"),
+            }
+            next = col.next();
+        }
 
-        let d_iter = iter.next().unwrap().trim();
-        let d = match d_iter.is_empty() {
-            true => t,
-            false => d_iter.parse().unwrap(),
-        };
+        // Check varibales to ensure they are instantiated properly
+        // Note: it does not matter if P is not instantiated as we will perform deadline monotonic
+        // priority ordering if any task has a priority 0
 
-        let c = iter.next().unwrap().parse().unwrap();
+        // It is critical that d is instantiated
+        d = if d == 0.0 { t } else { d };
 
-        let p_iter = iter.next().unwrap().trim();
-        let p = match p_iter.is_empty() {
-            true => 0,
-            false => p_iter.parse().unwrap(),
-        };
+        // If C or T is not given it is impossible to recover
+        if c == 0.0 {
+            panic!("A computation time must be given");
+        }
+
+        if t == 0.0 {
+            panic!("A period must be given");
+        }
+
+        // Not having a name makes RTA very unclear about which tasks pass and which tasks fail
+        if name.is_empty() {
+            warn!("You should name your tasks so you can distinguish them");
+        }
 
         let u = c / t;
 
@@ -159,7 +230,7 @@ fn get_inp(file: &PathBuf, resources: Option<&str>) -> Vec<task::Task> {
 
         // create task and push to task_set
         task_set.push(task::Task {
-            name,
+            name: name.to_string(),
             T: t,
             D: d,
             C: c,
@@ -168,11 +239,15 @@ fn get_inp(file: &PathBuf, resources: Option<&str>) -> Vec<task::Task> {
             critical_sections,
         });
     }
-    if task_set[0].P == 0 {
+
+    // check to see if any task has a priority 0
+    if task_set.iter().any(|task| task.P == 0) {
+        info!("Running deadline monotonic priority ordering");
         // deadline monotonic ordering is the same as rate monotonic ordering for implicit tasks
         // as the deadline for implicit tasks is their period
         deadline_monotonic_ordering(&mut task_set);
     }
+
     task_set
 }
 

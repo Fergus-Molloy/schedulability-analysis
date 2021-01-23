@@ -4,14 +4,16 @@ This is a command line utility to do some of the more tedious calculations neede
 
 ## CSV File
 
-The tasks_example file provides a template to use for supplying task sets. The columns *must* remain in that order.
+The `tasks_example` file provides a template to use for supplying task sets. The columns *must* remain in that order.
 However, the deadline and priority column are optional. If no deadline is given it is assumed that the task set has implicit deadlines (D=T).
 If no priority is given then deadline monotonic priority ordering is used (for implicit tasks this is the same as rate monotonic priority ordering).
+Priorities must be integers from 1 upwards where 1 is the lowest priority. If a priority of 0 is provided to *any* task then the program will perform
+deadline monotonic priority ordering to assign priorities (note omitting all priorities will also do this).
 
 
 ## Usage
 
-To use this you *must* supply a csv file (see CSV File section)containing the tasks you want analysed.
+To use this you *must* supply a CSV file (see CSV File section)containing the tasks you want analysed.
 If deadlines are implicit you need not put data there but the column must be present.
 
 The flags on this are a bit weird. The `-u` option or `--utilisation` **must** go at the end since it has an optional parameter.
