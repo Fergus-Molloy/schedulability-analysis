@@ -1,4 +1,5 @@
-use crate::resource::CriticalSection;
+#![allow(dead_code)]
+use crate::resource::{CriticalSection, Resource};
 use std::cmp::Ordering;
 use std::fmt;
 
@@ -60,4 +61,45 @@ impl Ord for Task {
     fn cmp(&self, other: &Self) -> Ordering {
         self.P.cmp(&other.P)
     }
+}
+
+pub fn get_resources(path: &str) -> Vec<CriticalSection> {
+    let v = Vec::new();
+    v
+}
+
+#[allow(non_snake_case)]
+pub fn LL_utilissation(tasks: &Vec<Task>, families: Option<u32>) -> (f64, f64) {
+    // number of families may or may not have been provided
+    let n = match families {
+        Some(v) => v as f64,
+        None => tasks.len() as f64,
+    };
+
+    let max_util: f64 = n * ((2 as f64).powf(1.0 / n) - 1.0);
+    (tasks.iter().map(|x| x.U).sum(), max_util)
+}
+
+/// Finds the response time of the given task
+///
+/// # Arguments
+///
+/// `task` is the task you want to analyse
+///
+/// `task_set` is the set off all tasks in the system
+pub fn response_time(task: &Task, tasks: &Vec<Task>) -> f64 {
+    //get higher priority tasks
+    let hp: Vec<Task> = tasks
+        .iter()
+        .filter(|x| x.P > task.P)
+        .map(|x| x.clone())
+        .collect();
+
+    let mut r = task.C;
+    let mut last_r = -1.0;
+    while r != last_r {
+        last_r = r;
+        r = task.C + hp.iter().map(|j| (r / j.T).ceil() * j.C).sum::<f64>();
+    }
+    r
 }
