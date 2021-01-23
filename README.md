@@ -11,7 +11,7 @@ If no priority is given then deadline monotonic priority ordering is used (for i
 
 ## Usage
 
-To use this you *must* supply a csv file ([see CSV file](README.md#CSV\ File))containing the tasks you want analysed.
+To use this you *must* supply a csv file (see CSV File section)containing the tasks you want analysed.
 If deadlines are implicit you need not put data there but the column must be present.
 
 The flags on this are a bit weird. The `-u` option or `--utilisation` **must** go at the end since it has an optional parameter.
