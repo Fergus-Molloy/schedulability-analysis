@@ -118,8 +118,6 @@ fn get_inp(file: &PathBuf, resources: Option<&str>) -> Vec<task::Task> {
     // read in tasks
     let inp = fs::read_to_string(file).expect("unable to read file");
 
-    let mut task_set = Vec::new();
-
     // use title line to check which parameters have been given and in what order
     // below is all the possible parameter options
     // let col_ordering = ["N", "T", "D", "C", "P", "CS"];
@@ -138,107 +136,116 @@ fn get_inp(file: &PathBuf, resources: Option<&str>) -> Vec<task::Task> {
     }
 
     //skip title line since it has been processed
-    for x in inp.lines().skip(1) {
-        // split by , since file is csv
-        let mut iter = x.split(',');
+    let mut task_set: Vec<task::Task> = inp
+        .lines()
+        .skip(1)
+        .map(|x| {
+            // split by , since file is csv
+            let mut iter = x.split(',');
 
-        // initialise varibales to impossible values
-        let mut name: &str = "";
-        let mut t: f64 = 0.0;
-        let mut d = 0.0;
-        let mut c = 0.0;
-        let mut p = 0;
+            // initialise varibales to impossible values
+            let mut name: &str = "";
+            let mut t: f64 = 0.0;
+            let mut d = 0.0;
+            let mut c = 0.0;
+            let mut p = 0;
+            let mut critical_sections = None;
 
-        // setup iterator varibales
-        let mut col = col_ordering.iter();
-        let mut next = col.next();
-        //while there is a column to process
-        while next.is_some() {
-            match next.unwrap() {
-                &"N" => {
-                    name = iter.next().unwrap().trim();
-                    debug!("name: {}", name);
-                }
-                &"T" => {
-                    t = iter.next().unwrap().parse().unwrap();
-                    debug!("T: {}", t);
-                }
-                &"D" => {
-                    let d_iter = iter.next().unwrap().trim();
-                    if d_iter.is_empty() {
-                        if t == 0.0 {
-                            // D column is present but no D is given (D is implicit) but T has not been processed yet
-                            d = 0.0;
+            // setup iterator varibales
+            let mut col = col_ordering.iter();
+            let mut next = col.next();
+            //while there is a column to process
+            while next.is_some() {
+                match next.unwrap() {
+                    &"N" => {
+                        name = iter.next().unwrap().trim();
+                        debug!("name: {}", name);
+                    }
+                    &"T" => {
+                        t = iter.next().unwrap().parse().unwrap();
+                        debug!("T: {}", t);
+                    }
+                    &"D" => {
+                        let d_iter = iter.next().unwrap().trim();
+                        if d_iter.is_empty() {
+                            if t == 0.0 {
+                                // D column is present but no D is given (D is implicit) but T has not been processed yet
+                                d = 0.0;
+                            } else {
+                                // D is not given but there is a T to use
+                                d = t;
+                            }
                         } else {
-                            // D is not given but there is a T to use
-                            d = t;
+                            // D is given
+                            d = d_iter.parse().unwrap();
                         }
-                    } else {
-                        // D is given
-                        d = d_iter.parse().unwrap();
+                        debug!("D: {}", d);
                     }
-                    debug!("D: {}", d);
-                }
-                &"C" => {
-                    let inp = iter.next().unwrap();
-                    debug!("c: {:?}", inp);
-                    c = inp.parse().unwrap();
-                }
-                &"P" => {
-                    let p_iter = iter.next().unwrap().trim();
-                    debug!("p: {}", p_iter);
-                    if p_iter.is_empty() {
-                        // P column is there but no value is given
-                        p = 0;
-                    } else {
-                        p = p_iter.parse().unwrap();
+                    &"C" => {
+                        let inp = iter.next().unwrap();
+                        c = inp.parse().unwrap();
+                        debug!("C: {}", c);
                     }
+                    &"P" => {
+                        let p_iter = iter.next().unwrap().trim();
+                        debug!("P: {}", p_iter);
+                        if p_iter.is_empty() {
+                            // P column is there but no value is given
+                            p = 0;
+                        } else {
+                            p = p_iter.parse().unwrap();
+                        }
+                    }
+                    &"CR" => {
+                        let cr_iter = iter.next().unwrap();
+                        critical_sections = if cr_iter.is_empty() {
+                            None
+                        } else {
+                            Some(task::get_resources(cr_iter))
+                        };
+                    }
+                    _ => panic!("something has gone horribly wrong, God is dead"),
                 }
-                _ => panic!("something has gone horribly wrong, God is dead"),
+                next = col.next();
             }
-            next = col.next();
-        }
 
-        // Check varibales to ensure they are instantiated properly
-        // Note: it does not matter if P is not instantiated as we will perform deadline monotonic
-        // priority ordering if any task has a priority 0
+            // Check varibales to ensure they are instantiated properly
+            // Note: it does not matter if P is not instantiated as we will perform deadline monotonic
+            // priority ordering if any task has a priority 0
 
-        // It is critical that d is instantiated
-        d = if d == 0.0 { t } else { d };
+            // It is critical that d is instantiated
+            let d = if d == 0.0 { t } else { d };
 
-        // If C or T is not given it is impossible to recover
-        if c == 0.0 {
-            panic!("A computation time must be given");
-        }
+            // If C or T is not given it is impossible to recover
+            if c == 0.0 {
+                panic!("A computation time must be given");
+            }
 
-        if t == 0.0 {
-            panic!("A period must be given");
-        }
+            if t == 0.0 {
+                panic!("A period must be given");
+            }
 
-        // Not having a name makes RTA very unclear about which tasks pass and which tasks fail
-        if name.is_empty() {
-            warn!("You should name your tasks so you can distinguish them");
-        }
+            // Not having a name makes RTA very unclear about which tasks pass and which tasks fail
+            if name.is_empty() {
+                warn!("You should name your tasks so you can distinguish them");
+            }
 
-        let u = c / t;
+            let u = c / t;
 
-        //TODO: handle resources
-        let critical_sections = match resources {
-            None => None,
-            Some(path) => Some(task::get_resources(path)),
-        };
+            //TODO: handle resources
 
-        // create task and push to task_set
-        task_set.push(task::Task {
-            name: name.to_string(),
-            T: t,
-            D: d,
-            C: c,
-            P: p,
-            U: u,
-            critical_sections,
-        });
-    }
+            // create task and push to task_set
+            task::Task {
+                name: name.to_string(),
+                T: t,
+                D: d,
+                C: c,
+                P: p,
+                U: u,
+                critical_sections,
+            }
+        })
+        .collect();
 
     // check to see if any task has a priority 0
     if task_set.iter().any(|task| task.P == 0) {
