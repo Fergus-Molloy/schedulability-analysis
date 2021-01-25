@@ -26,6 +26,9 @@ struct Opt {
     #[structopt(short, long)]
     debug: bool,
 
+    #[structopt(long)]
+    implicit: bool,
+
     /// Perfrom response time analysis on the task set
     #[structopt(short, long)]
     response_time: bool,
@@ -62,7 +65,7 @@ fn command_line() {
     b.init();
 
     // Create task set
-    let task_set = get_inp(&opt.input, None);
+    let task_set = get_inp(&opt.input, None, opt.implicit);
 
     if opt.debug {
         for task in task_set.iter() {
@@ -114,7 +117,7 @@ fn command_line() {
     }
 }
 
-fn get_inp(file: &PathBuf, resources: Option<&str>) -> Vec<task::Task> {
+fn get_inp(file: &PathBuf, resources: Option<&str>, implicit: bool) -> Vec<task::Task> {
     // read in tasks
     let inp = fs::read_to_string(file).expect("unable to read file");
 
@@ -167,18 +170,14 @@ fn get_inp(file: &PathBuf, resources: Option<&str>) -> Vec<task::Task> {
                     }
                     &"D" => {
                         let d_iter = iter.next().unwrap().trim();
-                        if d_iter.is_empty() {
-                            if t == 0.0 {
-                                // D column is present but no D is given (D is implicit) but T has not been processed yet
-                                d = 0.0;
-                            } else {
-                                // D is not given but there is a T to use
-                                d = t;
-                            }
-                        } else {
-                            // D is given
+                        if !d_iter.is_empty() {
                             d = d_iter.parse().unwrap();
                         }
+                        //else {
+                        // D column is present but no D is given (D is implicit)
+                        // this case is dealt with later on as we know that T will be initialised by
+                        // then
+                        // }
                         debug!("D: {}", d);
                     }
                     &"C" => {
@@ -209,12 +208,12 @@ fn get_inp(file: &PathBuf, resources: Option<&str>) -> Vec<task::Task> {
                 next = col.next();
             }
 
-            // Check varibales to ensure they are instantiated properly
-            // Note: it does not matter if P is not instantiated as we will perform deadline monotonic
-            // priority ordering if any task has a priority 0
+            // Check varibales to ensure they are initialised properly
+            // Note: it does not matter if P is not initialised as we will perform
+            // deadline monotonic priority ordering if any task has a priority 0
 
-            // It is critical that d is instantiated
-            let d = if d == 0.0 { t } else { d };
+            // It is critical that d is initialised
+            let d = if (d == 0.0 || implicit) { t } else { d };
 
             // If C or T is not given it is impossible to recover
             if c == 0.0 {
@@ -258,6 +257,11 @@ fn get_inp(file: &PathBuf, resources: Option<&str>) -> Vec<task::Task> {
     task_set
 }
 
+/// Performs deadline monotonic priority ordering in place on the task set
+/// the task set will be in priority order after this function has finished
+///
+/// Deadline monotonic priority ordering places tasks with a shorter deadline at a higher priority
+/// than tasks with a longer deadline
 fn deadline_monotonic_ordering(task_set: &mut Vec<task::Task>) {
     task_set.sort_by(|task_a, task_b| task_a.D.partial_cmp(&task_b.D).unwrap());
     let mut p = task_set.len() as u32;
@@ -267,6 +271,15 @@ fn deadline_monotonic_ordering(task_set: &mut Vec<task::Task>) {
     }
 }
 
+/// Performs rate monotonic priority ordering in place on the task set.
+/// The task set will be in priority order after this function is finished.
+///
+/// Rate monotonic priority ordering places tasks with a shorter period at a higher priority than
+/// tasks with a longer period. If the task set has implicit deadlines this is the same as
+/// deadline monotonic priority ordering
+///
+/// In general this should not be used as deadline monotonic priority ordering is at least as good if not
+/// better for all task sets.
 fn rate_monotonic_ordering(task_set: &mut Vec<task::Task>) {
     task_set.sort_by(|task_a, task_b| task_a.T.partial_cmp(&task_b.T).unwrap());
     let mut p = task_set.len() as u32;
